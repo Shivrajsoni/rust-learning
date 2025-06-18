@@ -10,6 +10,42 @@ use std::time::{SystemTime, UNIX_EPOCH};
 enum BlockchainError {
     TimeError(String),
 }
+
+#[derive(Clone, Debug)]
+struct Transaction {
+    from: String,
+    to: String,
+    amount: u64,
+    fee: u64,
+    signature: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+struct MultipleTransactions {
+    transaction_table: Vec<Transaction>,
+}
+
+impl fmt::Display for Transaction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "From: {} To: {} Amount: {} Fee: {}",
+            self.from, self.to, self.amount, self.fee
+        )
+    }
+}
+
+impl fmt::Display for MultipleTransactions {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut result = String::new();
+        for (i, transaction) in self.transaction_table.iter().enumerate() {
+            result.push_str(&format!("Transaction {}: {} ", i + 1, transaction));
+        }
+        write!(f, "{}", result)
+    }
+}
+
+const DIFFICULTY: u32 = 2;
 struct Block {
     index: u32,
     prev_hash: String,
@@ -51,7 +87,7 @@ impl Block {
         loop {
             self.hash = self.calculate_hash();
             iteration += 1;
-            if !self.hash.is_empty() && &self.hash[..2] == "00" {
+            if !self.hash.is_empty() && &self.hash[..DIFFICULTY as usize] == "00" {
                 println!(
                     "{}",
                     format!("Block Mined with Hash {} ", self.index).green()
@@ -117,7 +153,7 @@ fn main() {
     let mut nexa = match BlockChain::new() {
         Ok(chain) => chain,
         Err(e) => {
-            println!("Error Creating Blockchain : {:?}", e);
+            println!("{}", format!("Error Creating Blockchain : {:?}", e).red());
             return;
         }
     };
@@ -132,8 +168,48 @@ fn main() {
             miner_name.clone()
         };
 
-        let transaction = format!("Transaction from {} to {}", sender, recipient);
-        let new_block = match Block::new((i + 1) as u32, String::new(), transaction.clone()) {
+        // Create multiple transactions for each block
+        let mut transactions = Vec::new();
+
+        // First transaction
+        let transaction1 = Transaction {
+            from: sender.clone(),
+            to: recipient.clone(),
+            amount: 1000,
+            fee: 10,
+            signature: None,
+        };
+        transactions.push(transaction1);
+
+        // Second transaction
+        let transaction2 = Transaction {
+            from: recipient.clone(),
+            to: sender.clone(),
+            amount: 2000,
+            fee: 20,
+            signature: None,
+        };
+        transactions.push(transaction2);
+
+        // Third transaction
+        let transaction3 = Transaction {
+            from: sender.clone(),
+            to: recipient.clone(),
+            amount: 3000,
+            fee: 30,
+            signature: None,
+        };
+        transactions.push(transaction3);
+
+        let multiple_transactions = MultipleTransactions {
+            transaction_table: transactions.clone(),
+        };
+
+        let new_block = match Block::new(
+            (i + 1) as u32,
+            String::new(),
+            multiple_transactions.to_string(),
+        ) {
             Ok(block) => block,
             Err(e) => {
                 println!("{}", format!("Error creating new block: {:?}", e).red());
@@ -142,9 +218,17 @@ fn main() {
         };
         nexa.add_new_block(new_block);
 
-        println!("{}", format!("Transaction: {}", transaction).blue().bold());
-        sender = recipient;
+        // Display all transactions in this block
+        println!("{}", format!("Block {} Transactions:", i + 1).cyan().bold());
+        for (idx, transaction) in transactions.iter().enumerate() {
+            println!(
+                "{}",
+                format!("  Transaction {}: {}", idx + 1, transaction).blue()
+            );
+        }
         println!();
+
+        sender = recipient;
     }
 
     let total_blocks = nexa.get_total_block();
