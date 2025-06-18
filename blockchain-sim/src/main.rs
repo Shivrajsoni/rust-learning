@@ -1,17 +1,22 @@
 use chrono::NaiveDateTime;
 use colored::*;
+use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::fmt;
+use std::fs::File;
+use std::io::Write;
 use std::thread;
 use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
+
+const DIFFICULTY: u32 = 2;
 
 #[derive(Debug)]
 enum BlockchainError {
     TimeError(String),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 struct Transaction {
     from: String,
     to: String,
@@ -20,9 +25,31 @@ struct Transaction {
     signature: Option<String>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 struct MultipleTransactions {
     transaction_table: Vec<Transaction>,
+}
+
+#[derive(Debug, Serialize)]
+struct Block {
+    index: u32,
+    prev_hash: String,
+    timestamp: u64,
+    data: MultipleTransactions,
+    nonce: u64,
+    hash: String,
+}
+#[derive(Debug, Serialize)]
+struct BlockChain {
+    chain: Vec<Block>,
+}
+
+impl fmt::Display for Block {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let datetime =
+            NaiveDateTime::from_timestamp_opt(self.timestamp as i64, 0).unwrap_or_default();
+        write!(f, "Block {}: {} at {}", self.index, self.data, datetime)
+    }
 }
 
 impl fmt::Display for Transaction {
@@ -45,18 +72,12 @@ impl fmt::Display for MultipleTransactions {
     }
 }
 
-const DIFFICULTY: u32 = 2;
-struct Block {
-    index: u32,
-    prev_hash: String,
-    timestamp: u64,
-    data: String,
-    nonce: u64,
-    hash: String,
-}
-
 impl Block {
-    fn new(index: u32, prev_hash: String, data: String) -> Result<Block, BlockchainError> {
+    fn new(
+        index: u32,
+        prev_hash: String,
+        data: MultipleTransactions,
+    ) -> Result<Block, BlockchainError> {
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map_err(|e| BlockchainError::TimeError(format!("Time Error : {}", e)))?;
@@ -104,21 +125,12 @@ impl Block {
     }
 }
 
-impl fmt::Display for Block {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let datetime =
-            NaiveDateTime::from_timestamp_opt(self.timestamp as i64, 0).unwrap_or_default();
-        write!(f, "Block {}: {} at {}", self.index, self.data, datetime)
-    }
-}
-
-struct BlockChain {
-    chain: Vec<Block>,
-}
-
 impl BlockChain {
     fn new() -> Result<BlockChain, BlockchainError> {
-        let genesis_block = Block::new(0, String::new(), String::from("genesis block"))?;
+        let genesis_block_data = MultipleTransactions {
+            transaction_table: vec![],
+        };
+        let genesis_block = Block::new(0, String::new(), genesis_block_data)?;
         Ok(BlockChain {
             chain: vec![genesis_block],
         })
@@ -205,11 +217,7 @@ fn main() {
             transaction_table: transactions.clone(),
         };
 
-        let new_block = match Block::new(
-            (i + 1) as u32,
-            String::new(),
-            multiple_transactions.to_string(),
-        ) {
+        let new_block = match Block::new((i + 1) as u32, String::new(), multiple_transactions) {
             Ok(block) => block,
             Err(e) => {
                 println!("{}", format!("Error creating new block: {:?}", e).red());
@@ -257,4 +265,12 @@ fn main() {
             .green()
             .bold()
     );
+
+    //logic for saving your file to json file
+
+    let json = serde_json::to_string_pretty(&nexa).unwrap();
+    let mut file = File::create("blockchain_data.json").unwrap();
+    file.write_all(json.as_bytes()).unwrap();
+
+    println!("{} ", "Blockchain saved to the blockchain_data.json file ");
 }

@@ -5,10 +5,10 @@
 **todos**
 
 - Error Validation - basic level done
-- Colored terminal Outputs
-- Not make Difficulty hardCoded it should be vary , it should be fetched
-- saving blockchain data in a json file
-- Organize and create proper transactions , create a pool for (pending transactions )
+- Colored terminal Outputs - done
+- Not make Difficulty hardCoded it should be vary , it should be fetched - done
+- saving blockchain data in a json file - done
+- Organize and create proper transactions , create a pool for (pending transactions ) - done
 - **Advance Feature**
 
 - Implementing wallet struct with public/pricate keypair
