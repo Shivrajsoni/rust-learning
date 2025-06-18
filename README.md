@@ -1,5 +1,9 @@
-***RUST MINI PROJECTS FOR LEARNING PURPOSE***
+**_RUST MINI PROJECTS FOR LEARNING PURPOSE_**
+
 **List**
+
 - String Spillter
 - MiniGrep
-- Blockchain Simulator 
+- Blockchain Simulator
+
+// testing purpose
