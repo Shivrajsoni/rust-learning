@@ -4,7 +4,7 @@
 
 **todos**
 
-- Error Validation
+- Error Validation - basic level done
 - Colored terminal Outputs
 - Not make Difficulty hardCoded it should be vary , it should be fetched
 - saving blockchain data in a json file
