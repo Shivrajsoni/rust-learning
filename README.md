@@ -5,5 +5,3 @@
 - String Spillter
 - MiniGrep
 - Blockchain Simulator
-
-// testing purpose
