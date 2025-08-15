@@ -1,0 +1,3 @@
+[submodule "term_colr"]
+	path = term_colr
+	url = https://github.com/Shivrajsoni/term_colr.git
