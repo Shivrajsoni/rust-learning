@@ -9,6 +9,7 @@ enum Token {
     ItalicEnd,
     Text(String),
     NewLine,
+    Link { text: String, url: String },
 }
 
 #[derive(Debug, PartialEq)]
@@ -19,6 +20,7 @@ enum Node {
     Bold(Vec<Node>),
     Italic(Vec<Node>),
     Text(String),
+    Link { text: String, url: String },
 }
 
 fn lex(input: &str) -> Vec<Token> {
@@ -26,7 +28,6 @@ fn lex(input: &str) -> Vec<Token> {
     let mut chars = input.chars().peekable();
     let mut bold_active = false;
     let mut italic_active = false;
-
     while let Some(c) = chars.next() {
         match c {
             '#' => {
@@ -62,11 +63,57 @@ fn lex(input: &str) -> Vec<Token> {
             '\n' => {
                 tokens.push(Token::NewLine);
             }
+            '[' => {
+                let mut text = String::new();
+                while let Some(&ch) = chars.peek() {
+                    if ch == ']' {
+                        break;
+                    }
+                    text.push(chars.next().unwrap());
+                }
+
+                // Check for the full link syntax: [text](url)
+                if chars.peek() == Some(&']') {
+                    chars.next(); // consume ']'
+                    if chars.peek() == Some(&'(') {
+                        chars.next(); // consume '('
+                        let mut url = String::new();
+                        while let Some(&ch) = chars.peek() {
+                            if ch == ')' {
+                                break;
+                            }
+                            url.push(chars.next().unwrap());
+                        }
+                        if chars.peek() == Some(&')') {
+                            chars.next(); // consume ')'
+                            tokens.push(Token::Link { text, url });
+                        } else {
+                            // This is a malformed link, like [text](url
+                            // Treat all parts as plain text.
+                            tokens.push(Token::Text("[".to_string()));
+                            tokens.push(Token::Text(text));
+                            tokens.push(Token::Text("]".to_string()));
+                            tokens.push(Token::Text("(".to_string()));
+                            tokens.push(Token::Text(url));
+                        }
+                    } else {
+                        // This is just text in brackets, like [text]
+                        tokens.push(Token::Text("[".to_string()));
+                        tokens.push(Token::Text(text));
+                        tokens.push(Token::Text("]".to_string()));
+                    }
+                } else {
+                    // No closing bracket found, like [text
+                    tokens.push(Token::Text("[".to_string()));
+                    tokens.push(Token::Text(text));
+                }
+            }
+
             _ => {
                 let mut buff = String::new();
                 buff.push(c);
                 while let Some(&next) = chars.peek() {
-                    if next == '#' || next == '*' || next == '\n' {
+                    if next == '#' || next == '*' || next == '\n' || next == '[' {
                         break;
                     }
                     buff.push(chars.next().unwrap());
@@ -147,6 +194,13 @@ fn parse_inlines(tokens: &[Token]) -> Vec<Node> {
                     i += 1; // Consume ItalicEnd
                 }
             }
+            Token::Link { text, url } => {
+                nodes.push(Node::Link {
+                    text: text.clone(),
+                    url: url.clone(),
+                });
+                i += 1;
+            }
             // We shouldn't encounter these here if our block parsing is correct, but we'll skip them.
             Token::Heading(_) | Token::NewLine | Token::BoldEnd | Token::ItalicEnd => {
                 i += 1;
@@ -158,10 +212,11 @@ fn parse_inlines(tokens: &[Token]) -> Vec<Node> {
 
 fn render(node: &Node) -> String {
     match node {
-        Node::Document(children) => children.iter().map(render).collect::<Vec<String>>().join(
-            "
-",
-        ),
+        Node::Document(children) => children
+            .iter()
+            .map(render)
+            .collect::<Vec<String>>()
+            .join("\n"),
         Node::Heading(level, children) => {
             format!("<h{}>{}</h{}>", level, render_all(children), level)
         }
@@ -175,6 +230,9 @@ fn render(node: &Node) -> String {
             format!("<em>{}</em>", render_all(children))
         }
         Node::Text(text) => text.clone(),
+        Node::Link { text, url } => {
+            format!("<a href=\"{}\">{}</a>", url, text)
+        }
     }
 }
 

@@ -166,3 +166,15 @@ fn test_render_all() {
         "<h1>Title</h1>\n<p>This is <strong>bold</strong>.</p>"
     );
 }
+
+#[test]
+fn test_render_link() {
+    let node = Node::Document(vec![Node::Link {
+        text: "github".to_string(),
+        url: "https://github.com/Shivrajsoni".to_string(),
+    }]);
+    assert_eq!(
+        render(&node),
+        "<a href=\"https://github.com/Shivrajsoni\">github</a>",
+    );
+}
