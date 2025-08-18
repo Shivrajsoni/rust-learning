@@ -3,3 +3,6 @@
   url = https://github.com/Shivrajsoni/term_colr.git
 
 
+[submodule "markdown-to-html-parser"]
+	path = markdown-to-html-parser
+	url = git@github.com:Shivrajsoni/markdown-html-parser.git
