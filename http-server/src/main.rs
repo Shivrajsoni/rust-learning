@@ -1,8 +1,15 @@
-use std::{
-    collections::HashMap,
-    io::{Read, Write},
-    net::{TcpListener, TcpStream},
-};
+// We need to declare the new module so that Rust knows to look for `thread_pool.rs`
+mod thread_pool;
+
+use crate::thread_pool::ThreadPool;
+use std::collections::HashMap;
+use std::io::{Read, Write};
+use std::net::{TcpListener, TcpStream};
+
+// --- Teaching Note ---
+// The old, unimplemented ThreadPool, Worker, and Job structs that were here have been removed.
+// They are now replaced by our complete implementation in `thread_pool.rs`.
+// This is good practice for organizing code into modules.
 
 #[derive(Debug)]
 pub struct Request {
@@ -22,7 +29,6 @@ pub struct Response {
 
 impl Response {
     pub fn json(status: u16, body: &str, headers: Option<Vec<(String, String)>>) -> Self {
-        // conversion to response code
         let content_len = body.len();
         let predetermined_headers = vec![
             ("Content-Type".to_string(), "application/json".to_string()),
@@ -46,7 +52,6 @@ impl Response {
     }
 
     pub fn resolve(response: &Response) -> String {
-        // response to string code
         let mut response_str = format!(
             "HTTP/1.1 {}
 ",
@@ -72,7 +77,6 @@ const MESSAGE_SIZE: usize = 1024;
 
 impl Request {
     pub fn new(mut stream: &TcpStream) -> Result<Self, String> {
-        // processing code
         let mut recieved: Vec<u8> = vec![];
         let mut rx_bytes = [0u8; MESSAGE_SIZE];
 
@@ -93,23 +97,14 @@ impl Request {
         }
 
         let request_text = String::from_utf8(recieved).unwrap();
-
         let mut request_lines: Vec<&str> = request_text.split_inclusive('\n').collect();
-
         let mut header_map: HashMap<String, String> = HashMap::new();
         let mut query_params: HashMap<String, String> = HashMap::new();
-
-        // GET /path?x=1 HTTP/1.1
-
         let request_line = request_lines[0];
         let mut parts = request_line.split_ascii_whitespace();
-
         let http_method = parts.next().unwrap().to_string();
         let full_path = parts.next().unwrap();
-
-        // seperate path and query string
         let path_and_query: Vec<&str> = full_path.split('?').collect();
-
         let path = path_and_query[0].to_string();
 
         if path_and_query.len() > 1 {
@@ -122,15 +117,10 @@ impl Request {
             }
         }
 
-        // we have manipulated the first line of request lines so we can remove it
         request_lines.remove(0);
-
-        let blank_line_index = request_lines
-            .iter()
-            .position(|&line| line == "\r\n")
-            .unwrap();
-        let body_lines = &mut request_lines.split_off(blank_line_index);
-        body_lines.remove(0); // remove the blank line itself
+        let blank_line_index = request_lines.iter().position(|&line| line == "\r\n").unwrap();
+        let mut body_lines = &mut request_lines.split_off(blank_line_index);
+        body_lines.remove(0);
         let body_content = body_lines.join("");
 
         for header_line in &request_lines {
@@ -155,26 +145,48 @@ impl Request {
 fn main() {
     println!("Working on Http from scratch");
 
-    // Bind a listener to a port.
-    // Using a port like 7878 which is less likely to be in use.
     let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
-    println!("Server listening on port 7878");
+    println!("Server listening on port 7878 with a thread pool.");
 
-    // Accept connections and process them.
-    // thread per connections architecture
+    // --- Teaching Note ---
+    // Here we create our new ThreadPool.
+    // A size of 4 is a common default. In a real-world application, this might be
+    // configured based on the number of CPU cores on the machine.
+    let pool = ThreadPool::new(4);
+
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
                 println!("Connection Established!");
+
+                // --- Teaching Note ---
+                // This is the core change. Instead of spawning an infinite number of threads,
+                // we pass a closure to `pool.execute`. The pool will then hand this closure
+                // to one of its available worker threads to be run.
+                // The `move` keyword is used to transfer ownership of the `stream` variable
+                // to the closure, which is necessary because the closure will be run on a
+                // different thread.
+                pool.execute(move || {
+                    handle_connection(stream);
+                });
+
+                /*
+                --- This is the old, commented-out logic ---
+                // This is the "thread per request" model, which we have now replaced.
+                // It is inefficient because it creates a new thread for every single connection,
+                // which can overwhelm the operating system under heavy load.
                 std::thread::spawn(move || {
                     handle_connection(stream);
                 });
+                */
             }
             Err(e) => {
                 println!("Error: {}", e);
             }
         }
     }
+
+    println!("Shutting down main thread.");
 }
 
 fn handle_connection(mut stream: TcpStream) {
@@ -205,4 +217,3 @@ fn handle_connection(mut stream: TcpStream) {
         }
     }
 }
-
